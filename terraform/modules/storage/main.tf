@@ -7,8 +7,9 @@ terraform {
   }
 }
 
-resource "aws_s3_bucket" "s3_backend_storage_cost_report" {
+resource "aws_s3_bucket" "s3_backend" {
   bucket = var.bucket_name
+  acl    = "private"
 
   versioning {
     enabled = true
@@ -24,3 +25,17 @@ resource "aws_s3_bucket" "s3_backend_storage_cost_report" {
     }
   }
 }
+
+#https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cur_report_definition 
+/*
+resource "aws_cur_report_definition" "report-billing-master-account" {
+  report_name                =  var.report_name 
+  time_unit                  = "DAILY"
+  format                     = "Parquet"
+  compression                = "Parquet"
+  additional_schema_elements = ["RESOURCES"]
+  s3_bucket                  = var.bucket_report
+  s3_region                  = "eu-west-1"
+  additional_artifacts       = ["ATHENA"]
+}
+*/
