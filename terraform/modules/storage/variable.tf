@@ -7,25 +7,11 @@ locals {
     lensbucket   = "${local.project}-${local.environment}-storagelens"
     athenabucket = "${local.project}-${local.environment}-athena"
   }
+  # concatenate current region and account ex : eu-west-1:314283085815
+  currentaccountregion = join(":", [data.aws_region.current.name, data.aws_caller_identity.current.account_id])
+  
 }
 
-/*
-variable "bucket_report" {
-  description = "name of your bucket for cost report" 
-  type        = string
-}
-
-variable "report_name" {
-  description = "name of your cost and billing report"
-  type        = string
-}
-
-variable "region" {
-  description = "region for s3"
-  type = string
-  default = "us-east-1"
-}
-*/
 
 variable "costprefix" {
   description = "prefix used during creation of billing and cost report"
@@ -38,7 +24,7 @@ variable "tags" {
   description = "tags for all resource in the project"
   type        = map(any)
   default = {
-    env       = "tesing",
+    env       = "test",
     owner     = "devopshandsonlab",
     terraform = "true"
     project   = "s3_overview_cost_project"

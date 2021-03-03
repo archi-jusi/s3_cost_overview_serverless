@@ -9,8 +9,12 @@ terraform {
 
 # Get current partition - region + account 
 data "aws_partition" "current" {
-  
 }
+
+data "aws_region" "current" {}
+
+data "aws_caller_identity" "current" {}
+
 
 
 resource "aws_s3_bucket" "s3_backend" {
@@ -33,6 +37,7 @@ resource "aws_s3_bucket" "s3_backend" {
   }
 }
 
+
 resource "aws_s3_bucket_public_access_block" "blockbucket" {
   for_each = local.bucketmap
   bucket   = "${each.value}-backend-bucket"
@@ -46,7 +51,7 @@ resource "aws_s3_bucket_public_access_block" "blockbucket" {
 
 
 resource "aws_glue_catalog_database" "aws_glue_db" {
-  name = "${local.project}-glue-db"
+  name = "${local.project}-${local.environment}-glue-db"
 }
 
 # Creation role 
@@ -87,76 +92,76 @@ resource "aws_iam_role" "lambdarole" {
   tags = var.tags
 }
 
-# Creation policy json
+# Creation policy document for lambda 
+# 
+
+data "aws_iam_policy_document" "policy-document-lambda" {
+  statement {
+    actions   = ["logs:CreateLogGroup"]
+    resources = ["arn:aws:logs:${local.currentaccountregion}:*"]
+    effect = "Allow"
+  }
+  statement {
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["arn:aws:logs:${local.currentaccountregion}:log-group:*"]
+    effect = "Allow"
+  }
+
+  statement {
+    actions   = ["glue:StartCrawler"]
+    resources = ["*"]
+    effect = "Allow"
+  }
+  
+  # ! need to change the resource permission for s3
+  statement {
+    actions   = ["s3:PutBucketNotification"]
+    resources = ["arn:aws:s3:::*"]
+    effect = "Allow"
+  }
+}
+
 
 resource "aws_iam_policy" "policy-lambda" {
   name        = "${local.project}-${local.environment}-lambda-policy"
   description = "Policy used by lambda"
-
-  policy = jsonencode({
-    "Version" : "2012-10-17",
-    "Statement" : [
-      {
-        "Effect" : "Allow",
-        "Action" : [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        "Resource" : [
-          "arn:${data.aws_partition.current.partition}:logs:*:*:*"
-        ]
-      },
-      {
-        "Effect" : "Allow",
-        "Action" : [
-          "glue:StartCrawler"
-        ],
-        "Resource" : [
-          "*"
-        ]
-      },
-      {
-        "Effect" : "Allow",
-        "Action" : [
-          "s3:PutBucketNotification"
-        ],
-        "Resource" : [
-          "${aws_s3_bucket.s3_backend["costbucket"].arn}"
-        ]
-      }
-    ]
-  })
+  policy = data.aws_iam_policy_document.policy-document-lambda.json
 }
 
+# Policy Document for Glue 
+data "aws_iam_policy_document" "policy-document-glue" {
+  # ! need to change the resource permission for s3
+  statement {
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["arn:aws:s3:::*"]
+    effect = "Allow"
+  }
+  statement {
+    actions   = ["logs:CreateLogGroup"]
+    resources = ["arn:aws:logs:${local.currentaccountregion}:*"]
+    effect = "Allow"
+  }
+  statement {
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["arn:aws:logs:${local.currentaccountregion}:log-group:*"]
+    effect = "Allow"
+  }
+  
+  statement {
+    actions   = ["glue:UpdateDatabase", "glue:UpdatePartition", "glue:CreateTable", "glue:UpdateTable", "glue:ImportCatalogToGlue"]
+    resources = ["*"]
+    effect = "Allow"
+  }
+}
+
+# Create the policy based on the document
 resource "aws_iam_policy" "policy-glue" {
   name        = "${local.project}-${local.environment}-glue-policy"
   description = "Policy used by glue crawler"
-
-  policy = jsonencode({
-    "Version" : "2012-10-17",
-    "Statement" : [
-      {
-        "Effect" : "Allow",
-        "Action" : [
-          "s3:GetObject",
-          "s3:PutObject"
-        ],
-        "Resource" : [
-          "${aws_s3_bucket.s3_backend["costbucket"].arn}*"
-        ]
-      }
-    ]
-  })
+  policy = data.aws_iam_policy_document.policy-document-glue.json
 }
-
-# Attachment of policies to roles
 
 # Attachment for Glue 
-resource "aws_iam_role_policy_attachment" "glue_role_attach_policy_default" {
-  role       = aws_iam_role.gluerole.id
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
-}
 
 resource "aws_iam_role_policy_attachment" "glue_role_attach_policy" {
   role       = aws_iam_role.gluerole.id
@@ -170,7 +175,6 @@ resource "aws_iam_role_policy_attachment" "lambda_role_attach_policy" {
 }
 
 # Creation of Glue crawler 
-
 resource "aws_glue_crawler" "glue_crawler" {
   database_name = aws_glue_catalog_database.aws_glue_db.id
   name          = "${local.project}-${local.environment}-crawler"
@@ -205,18 +209,26 @@ data "archive_file" "lambda_zip_runglue" {
 
 resource "aws_lambda_function" "lambdarungluefunction" {
   filename      = "${path.module}/runglue.zip"
-  function_name = "lambdarunglue"
-  role          = aws_iam_role.lambdarole.id
-  handler       = "index.handler"
+  description   = "Lambda function for run glue crawler"
+  function_name = "${local.project}-${local.environment}-lambdarungluecrawler"
+  role          = aws_iam_role.lambdarole.arn
 
+  # handler name need to be the same as the filename
+  handler       = "runglue.handler"
+  
+  #timeout = 120
   runtime = "nodejs10.x"
-  /*timeout = 120
+  
   environment {
     variables = {
       CRAWLNAME = aws_glue_crawler.glue_crawler.id
     }
   }
-  tags = var.tags*/
+  tags = var.tags
+  
+  depends_on = [
+    aws_iam_role.lambdarole,
+  ]
 }
 
 resource "aws_lambda_permission" "allow_bucket_event_notification" {
