@@ -6,7 +6,7 @@ locals {
     costbucket   = "${local.project}-${local.environment}-costexplorer"
     lensbucket   = "${local.project}-${local.environment}-storagelens"
     athenabucket = "${local.project}-${local.environment}-athena"
-   }
+  }
 }
 
 /*
@@ -27,6 +27,13 @@ variable "region" {
 }
 */
 
+variable "costprefix" {
+  description = "prefix used during creation of billing and cost report"
+  type        = string
+  default     = "cost"
+}
+
+
 variable "tags" {
   description = "tags for all resource in the project"
   type        = map(any)
@@ -37,14 +44,3 @@ variable "tags" {
     project   = "s3_overview_cost_project"
   }
 }
-/*
-variable "bucket_map_name" {
-  description = "map of name for bucket"
-  type        = map(string)
-  default = {
-    costbucket   = "${local.project}-${local.environment}-costexplorer"
-    lensbucket   = "${local.project}-${local.environment}-storagelens"
-    athenabucket = "${local.project}-${local.environment}-athena"
-  }
-}
-*/
