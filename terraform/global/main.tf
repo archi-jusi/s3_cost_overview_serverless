@@ -14,8 +14,6 @@ provider "aws" {
 
 resource "aws_s3_bucket" "s3_terraform_state_test" {
   bucket = var.namebucketstate
-
-
   versioning {
     enabled = true
   }

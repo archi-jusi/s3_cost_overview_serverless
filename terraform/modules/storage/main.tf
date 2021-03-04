@@ -1,4 +1,5 @@
 terraform {
+  required_version = ">= 0.12"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -8,20 +9,18 @@ terraform {
 }
 
 # Get current partition - region + account 
-data "aws_partition" "current" {
-}
+data "aws_partition" "current" {}
 
 data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
 
 
-
 resource "aws_s3_bucket" "s3_backend" {
   for_each = local.bucketmap
-  bucket   = "${each.value}-backend-bucket"
+  bucket   = "${each.value}"
   acl      = "private"
-
+  
   versioning {
     enabled = true
   }
@@ -49,15 +48,15 @@ resource "aws_s3_bucket_public_access_block" "blockbucket" {
   ]
 }
 
-
+# ! add location for db on s3 - faster and more effcient
 resource "aws_glue_catalog_database" "aws_glue_db" {
-  name = "${local.project}-${local.environment}-glue-db"
+  name = "${var.project}-${var.environment}-glue-db"
 }
 
 # Creation role 
 
 resource "aws_iam_role" "gluerole" {
-  name = "${local.project}-${local.environment}-role-glue"
+  name = "${var.project}-${var.environment}-role-glue"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -75,7 +74,7 @@ resource "aws_iam_role" "gluerole" {
 }
 
 resource "aws_iam_role" "lambdarole" {
-  name = "${local.project}-${local.environment}-role-lambda"
+  name = "${var.project}-${var.environment}-role-lambda"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -113,27 +112,25 @@ data "aws_iam_policy_document" "policy-document-lambda" {
     effect = "Allow"
   }
   
-  # ! need to change the resource permission for s3
   statement {
     actions   = ["s3:PutBucketNotification"]
-    resources = ["arn:aws:s3:::*"]
+    resources = ["${local.arncost}*"]
     effect = "Allow"
   }
 }
 
-
 resource "aws_iam_policy" "policy-lambda" {
-  name        = "${local.project}-${local.environment}-lambda-policy"
+  name        = "${var.project}-${var.environment}-lambda-policy"
   description = "Policy used by lambda"
   policy = data.aws_iam_policy_document.policy-document-lambda.json
 }
 
-# Policy Document for Glue 
+# Policy Document for Glue Crawler
 data "aws_iam_policy_document" "policy-document-glue" {
-  # ! need to change the resource permission for s3
+  
   statement {
     actions   = ["s3:GetObject", "s3:PutObject"]
-    resources = ["arn:aws:s3:::*"]
+    resources = ["${local.arncost}*"]
     effect = "Allow"
   }
   statement {
@@ -156,7 +153,7 @@ data "aws_iam_policy_document" "policy-document-glue" {
 
 # Create the policy based on the document
 resource "aws_iam_policy" "policy-glue" {
-  name        = "${local.project}-${local.environment}-glue-policy"
+  name        = "${var.project}-${var.environment}-glue-policy"
   description = "Policy used by glue crawler"
   policy = data.aws_iam_policy_document.policy-document-glue.json
 }
@@ -177,12 +174,12 @@ resource "aws_iam_role_policy_attachment" "lambda_role_attach_policy" {
 # Creation of Glue crawler 
 resource "aws_glue_crawler" "glue_crawler" {
   database_name = aws_glue_catalog_database.aws_glue_db.id
-  name          = "${local.project}-${local.environment}-crawler"
+  name          = "${var.project}-${var.environment}-crawler"
   role          = aws_iam_role.gluerole.id
   tags          = var.tags
   # required that cost report are using prefix cost - the partition after the prefix is done by AWS 
   s3_target {
-    path       = "s3://${aws_s3_bucket.s3_backend["costbucket"].id}/${var.costprefix}/partition/report-daily-partition/report-daily-partition"
+    path       = "${local.prefixcostreport}"
     exclusions = ["**.json", "**.yml", "**.sql", "**.csv", "**.gz", "**.zip"]
   }
 
@@ -210,7 +207,7 @@ data "archive_file" "lambda_zip_runglue" {
 resource "aws_lambda_function" "lambdarungluefunction" {
   filename      = "${path.module}/runglue.zip"
   description   = "Lambda function for run glue crawler"
-  function_name = "${local.project}-${local.environment}-lambdarungluecrawler"
+  function_name = "${var.project}-${var.environment}-lambdarungluecrawler"
   role          = aws_iam_role.lambdarole.arn
 
   # handler name need to be the same as the filename
@@ -245,7 +242,7 @@ resource "aws_s3_bucket_notification" "bucket_notification_cost_report" {
   lambda_function {
     lambda_function_arn = aws_lambda_function.lambdarungluefunction.arn
     events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "${var.costprefix}/partition/report-daily-partition/report-daily-partition/"
+    filter_prefix       = "${var.costprefix}/${var.costreportname}/${var.costreportname}/"
     filter_suffix       = ".parquet"
   }
 
