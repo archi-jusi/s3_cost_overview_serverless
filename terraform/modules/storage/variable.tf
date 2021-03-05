@@ -73,6 +73,11 @@ variable "databasename" {
   type        = string
 }
 
+variable "workgroupname" {
+  description = "name for the workgroup"
+  type        = string
+}
+
 
 variable "tags" {
   description = "tags for all resource in the project"
