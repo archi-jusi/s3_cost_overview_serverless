@@ -10,15 +10,15 @@ The script or the tools will need to return these information :
 
 For each bucket:
 
-• Name
-• Creation date
-• Number of files
-• Total size of files
-• Last modified date of the most recent file
-• Type of storage
-• Encryption type
-• Extra like (life-cycle, cross-region replication, etc)
-• **how much does it cost**
+- Name
+- Creation date
+- Number of files
+- Total size of files
+- Last modified date of the most recent file
+- Type of storage
+- Encryption type
+- Extra like (life-cycle, cross-region replication, etc)
+- **how much does it cost**
 
 
 #### Display : 
@@ -123,14 +123,14 @@ Moreover Athena can integrate easily to QuickSight for easy data virtualization 
 
 Here is an overview of the infrastructure.
 
-[serverless infrastructure for cost](image/serverlesscostbucket.png)
+![serverless infrastructure for cost](image/serverlesscostbucket.png)
 
 
 It's possible to control Control Query Access and Costs from workgroup in Athena. 
 
 At the end, you will be able to query your db with Athena to have a result like that in seconds.
 
-[athena end result](image/AthenaQueryResult.png)
+![athena end result](image/AthenaQueryResult.png)
 
 As it's using SQL to make the query on S3, it will easy to make parsing or grouping and moreover using Athena and workgroup, you will be able to control who is able to make the query.
 
@@ -220,12 +220,12 @@ From billing, ![Cost and usage report](https://console.aws.amazon.com/billing/ho
 
 Create a new report, use the name you defined in the module from the variable costreportname and check the box "Include resource IDs"
 
-[cost and usage report](image/costandusagereport.png)
+![cost and usage report](image/costandusagereport.png)
 
 Next step, select the bucket create by Terraform defined with the variable **namebucketcostreport** , set the prefix defined in the variable **costprefix**.
 Select daily and Athena to use the Parquet compression.
 
-[cost and usage report](image/costandusagereport2.png)
+![cost and usage report](image/costandusagereport2.png)
 
 NOTE: Once the report will be create, you will need to wait until 24h before getting the first report.
 
@@ -278,8 +278,7 @@ module "aws_s3_backend" {
 }
 ```
 
-[storagelens1](image/storagelens1.png)
-
+![storagelens1](image/storagelens1.png)
 
 For the Home region, choose the same region you were using with terraform.
 
@@ -287,45 +286,8 @@ Then, configure as below.
 
 select Include all accounts in your organization or Limit the scope to your signed-in account if you defined the variable **organization** to false.
 
-[storagelens2](image/storagelens2.png)
+![storagelens2](image/storagelens2.png)
 
-[storagelens3](image/storagelens3.png)
+![storagelens3](image/storagelens3.png)
 
-
-
-
-  
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Storage Lens should be enable in the next 48h. 
