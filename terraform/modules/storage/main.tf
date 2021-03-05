@@ -479,7 +479,7 @@ resource "aws_s3_bucket_notification" "bucket_notification-lens" {
 }
 
 resource "aws_athena_workgroup" "workgroupcostathena" {
-  name = "workgroupcostathena"
+  name = var.workgroupname
   force_destroy = true
   configuration {
     enforce_workgroup_configuration    = true
