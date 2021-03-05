@@ -1,4 +1,3 @@
-# Replace the from with your table for Lens (lensreports)
 CREATE OR REPLACE VIEW lens_light AS 
 SELECT aws_account_number, bucket_name, aws_region, storage_class, metric_name, metric_value
 from lensreports
