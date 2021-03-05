@@ -8,6 +8,7 @@ terraform {
   }
 }
 
+
 # Get current partition - region + account 
 data "aws_partition" "current" {}
 
@@ -498,12 +499,38 @@ resource "aws_athena_workgroup" "workgroupcostathena" {
    tags = var.tags
 }
 
-
-
 resource "aws_athena_named_query" "listcost" {
   name      = "list_cost_report"
   workgroup = aws_athena_workgroup.workgroupcostathena.id
   database  = aws_athena_database.dbathena.name
   query     = "SELECT * FROM ${var.costreportname} WHERE MONTH = CAST(MONTH(CURRENT_DATE) AS varchar(4)) AND YEAR = CAST(YEAR(CURRENT_DATE) AS varchar(4)) AND line_item_product_code = 'AmazonS3'"
+}
+
+resource "aws_athena_named_query" "sqlcostview" {
+  name      = "create light view for cost usage"
+  workgroup = aws_athena_workgroup.workgroupcostathena.id
+  database  = aws_athena_database.dbathena.name
+  query     = templatefile("${path.module}/sqlquery/1_createcostlightview.sql", { db = aws_athena_database.dbathena.name, table = var.costreportname })
+}
+
+resource "aws_athena_named_query" "sqllensview" {
+  name      = "create light view for lens"
+  workgroup = aws_athena_workgroup.workgroupcostathena.id
+  database  = aws_athena_database.dbathena.name
+  query     = file("${path.module}/sqlquery/2_createviewstoragelens.sql") 
+}
+
+resource "aws_athena_named_query" "sqljoinview" {
+  name      = "create join view"
+  workgroup = aws_athena_workgroup.workgroupcostathena.id
+  database  = aws_athena_database.dbathena.name
+  query     = file("${path.module}/sqlquery/3_createjointableview.sql") 
+}
+
+resource "aws_athena_named_query" "sqlselectglobalview" {
+  name      = "select global view"
+  workgroup = aws_athena_workgroup.workgroupcostathena.id
+  database  = aws_athena_database.dbathena.name
+  query     = file("${path.module}/sqlquery/4_select_all_view.sql") 
 }
 
