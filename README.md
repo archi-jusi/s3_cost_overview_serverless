@@ -294,7 +294,7 @@ select Include all accounts in your organization or Limit the scope to your sign
 
 ![storagelens2](image/storagelens2.png)
 
-![storagelens3](image/storagelens3.png
+![storagelens3](image/storagelens3.png)
 
 For the storage, select the bucket defined from variable **namebucketlens**.
 
