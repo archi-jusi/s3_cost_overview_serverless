@@ -12,14 +12,24 @@ output "regionbucket" {
 }
 
 output "lambdarole" {
-  description = "role for lambda"
+  description = "role for lambda cost"
   value       = aws_iam_role.lambdarole.id
 }
 output "gluerole" {
-  description = "role for glue"
+  description = "role for glue cost"
   value       = aws_iam_role.gluerole.id
 }
 
+output "lambdarolelens" {
+  description = "role for lambda lens"
+  value       = aws_iam_role.lambdarole-lens.id
+}
+output "gluerolelens" {
+  description = "role for glue lens"
+  value       = aws_iam_role.gluerole-lens.id
+}
+
+/*
 output "rendered_lambda_json_policy" {
   description = "lambda json policy"
   value = data.aws_iam_policy_document.policy-document-lambda.json
@@ -29,6 +39,7 @@ output "rendered_glue_json_policy" {
   description = "lambda json policy"
   value = data.aws_iam_policy_document.policy-document-glue.json
 }
+*/
 output "currentpartition"  {
   description = "current partition"
   value = local.currentaccountregion
@@ -48,7 +59,7 @@ output "gluecrawler"  {
 }
 output "databaseforathena" {
   description = "DB destination for crawl"
-  value = aws_glue_catalog_database.aws_glue_db.id
+  value = aws_athena_database.dbathena.id
 }
 output "workgroupathena" {
   description = "workgroup for athena"

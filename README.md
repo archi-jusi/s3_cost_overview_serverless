@@ -46,7 +46,7 @@ For each bucket:
 :warning: The tools need to still be efficient and get the result in seconds even with millions or billions of file.
 
 
-### Architecture - evaluation of different solutions
+### Architecture - evaluation of the different solution
 
 The architecture step will be to evaluate the solution available and to analyse the pros and cons to see which direction will be the best to take.
 
@@ -107,7 +107,7 @@ This solution will cover all the need for cost and bucket information and it wil
 
 [AWS storage lens](https://aws.amazon.com/blogs/aws/s3-storage-lens/) will create report daily uploaded to an S3 bucket for the AWS Organizations master account and 
 
-When AWS put a new file in the cost and report or storage lens bucket an event is created that triggered a Lambda function which will run a Glue Crawler to update the database, a database to allow quick searches through AWS Athena.
+When AWS put a new file in the cost and report or storage lens bucket an event is created that triggered a Lambda function which will run a Glue Crawler to update the database, the schema and partitions.
   
 A view will be create to join the 2 tables (cost and lens) based on the bucket id.
 The view will be use to organize and have better performance for our queries.
@@ -120,4 +120,212 @@ The tools will connect to [Athena](https://docs.aws.amazon.com/athena/latest/ug/
 Athena is Serverless, so you don't have to manage any infrastructure.
 
 Moreover Athena can integrate easily to QuickSight for easy data virtualization and BI. 
+
+Here is an overview of the infrastructure.
+
+[serverless infrastructure for cost](image/serverlesscostbucket.png)
+
+
+It's possible to control Control Query Access and Costs from workgroup in Athena. 
+
+At the end, you will be able to query your db with Athena to have a result like that in seconds.
+
+[athena end result](image/AthenaQueryResult.png)
+
+As it's using SQL to make the query on S3, it will easy to make parsing or grouping and moreover using Athena and workgroup, you will be able to control who is able to make the query.
+
+### How to use the module 
+
+```hcl
+terraform {
+  required_version = "~>0.14.6"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 3.27"
+    }
+  }
+}
+
+provider "aws" {
+  ...
+}
+
+
+module "aws_s3_backend" {
+  source               = "..."
+  project              = "aws-s3-cost"
+  environment          = "staging"
+  namebucketcostreport = "staging-cost-bucket"
+  namebucketathena     = "staging-cost-athena"
+  namebucketlens       = "staging-cost-lens"
+  namelensdashboard    = "dashboard-lens-staging"
+  costprefix           = "cost"
+  costreportname       = "costreport"
+  tags = {
+    env       = "staging",
+    owner     = "devopshandsonlab",
+    terraform = "true"
+    project   = "s3_overview_cost_project"
+  }
+}
+
+```
+Note:
+
+The variable cost prefix and cost reportname will be used later to create the cost and usage report. 
+Unhapilly, this step will not be automate as Terraform has the feature only for us-east-1
+
+The module will deploy 31 resources as below: 
+```hcl
+module.aws_s3_backend.aws_athena_database.dbathena
+module.aws_s3_backend.aws_athena_named_query.listcost
+module.aws_s3_backend.aws_athena_workgroup.workgroupcostathena
+module.aws_s3_backend.aws_glue_crawler.glue_crawler
+module.aws_s3_backend.aws_glue_crawler.glue_crawler-lens
+module.aws_s3_backend.aws_iam_policy.custom-policy-glue
+module.aws_s3_backend.aws_iam_policy.custom-policy-glue-lens
+module.aws_s3_backend.aws_iam_policy.policy-lambda
+module.aws_s3_backend.aws_iam_policy.policy-lambda-lens
+module.aws_s3_backend.aws_iam_role.gluerole
+module.aws_s3_backend.aws_iam_role.gluerole-lens
+module.aws_s3_backend.aws_iam_role.lambdarole
+module.aws_s3_backend.aws_iam_role.lambdarole-lens
+module.aws_s3_backend.aws_iam_role_policy_attachment.glue_role_attach_policy_custom
+module.aws_s3_backend.aws_iam_role_policy_attachment.glue_role_attach_policy_custom-lens
+module.aws_s3_backend.aws_iam_role_policy_attachment.glue_role_attach_policy_managed
+module.aws_s3_backend.aws_iam_role_policy_attachment.glue_role_attach_policy_managed-lens
+module.aws_s3_backend.aws_iam_role_policy_attachment.lambda_role_attach_policy
+module.aws_s3_backend.aws_iam_role_policy_attachment.lambda_role_attach_policy-lens
+module.aws_s3_backend.aws_lambda_function.lambdarungluefunction
+module.aws_s3_backend.aws_lambda_function.lambdarungluefunction-lens
+module.aws_s3_backend.aws_lambda_permission.allow_bucket_event_notification
+module.aws_s3_backend.aws_lambda_permission.allow_bucket_event_notification-lens
+module.aws_s3_backend.aws_s3_bucket.s3_backend["athenabucket"]
+module.aws_s3_backend.aws_s3_bucket.s3_backend["costbucket"]
+module.aws_s3_backend.aws_s3_bucket.s3_backend["lensbucket"]
+module.aws_s3_backend.aws_s3_bucket_notification.bucket_notification-lens
+module.aws_s3_backend.aws_s3_bucket_notification.bucket_notification_cost_report
+module.aws_s3_backend.aws_s3_bucket_public_access_block.blockbucket["athenabucket"]
+module.aws_s3_backend.aws_s3_bucket_public_access_block.blockbucket["costbucket"]
+module.aws_s3_backend.aws_s3_bucket_public_access_block.blockbucket["lensbucket"]
+```
+
+Once everything is deployed from the module with Terraform you will need to create a cost and usage report using the variable set in the module : 
+- costprefix 
+- costreportname
+
+From billing, ![Cost and usage report](https://console.aws.amazon.com/billing/home#/reports)
+
+Create a new report, use the name you defined in the module from the variable costreportname and check the box "Include resource IDs"
+
+[cost and usage report](image/costandusagereport.png)
+
+Next step, select the bucket create by Terraform defined with the variable **namebucketcostreport** , set the prefix defined in the variable **costprefix**.
+Select daily and Athena to use the Parquet compression.
+
+[cost and usage report](image/costandusagereport2.png)
+
+NOTE: Once the report will be create, you will need to wait until 24h before getting the first report.
+
+Then, for Storage Lens, as it's a quite new service, it's not possible at all to deploy from Terraform or even Cloudformation, or aws CLI and we will need to wait until 48h that the report is active.
+
+Storage Lens will give us these information:
+
+```
+Total storage
+Object count
+Current version bytes
+Current version object count
+Noncurrent version bytes
+Noncurrent version object count
+Delete marker object count
+Encrypted bytes
+Encrypted object count
+Replicated bytes
+Replicated object count
+Object lock bytes
+Object lock object count
+Incomplete MPU bytes
+Incomplete MPU object count
+```
+
+To enable Storage Lens, Master account of your organization has to be used. 
+
+By default, this terraform module is done for an organization but if you want to have this features just for the account you are using with Terraform, you can change the variable organization to false (bool). 
+
+```hcl
+module "aws_s3_backend" {
+  source               = "..."
+  organization = false
+  ...
+}
+```
+
+Let's enable this amazing [feature](https://aws.amazon.com/blogs/aws/s3-storage-lens/)
+
+You will need to use your **master account** to enable this feature for your organization. 
+
+First choose a name, the name has to be what you define in the variable of the module **namelensdashboard** and the bucket 
+
+```hcl
+module "aws_s3_backend" {
+  source               = "..."
+  namelensdashboard    = "dashboard-lens-staging"
+  namebucketlens       = "staging-cost-lens"
+  ...
+}
+```
+
+[storagelens1](image/storagelens1.png)
+
+
+For the Home region, choose the same region you were using with terraform.
+
+Then, configure as below.
+
+select Include all accounts in your organization or Limit the scope to your signed-in account if you defined the variable **organization** to false.
+
+[storagelens2](image/storagelens2.png)
+
+[storagelens3](image/storagelens3.png)
+
+
+
+
+  
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

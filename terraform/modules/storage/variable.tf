@@ -11,10 +11,17 @@ locals {
   }
   arncost = "arn:aws:s3:::${var.namebucketcostreport}/"
   arnlens = "arn:aws:s3:::${var.namebucketlens}/"
-  
+  accountprefix = var.organization == true ? data.aws_organizations_organization.organization.id : data.aws_caller_identity.current.account_id
+
 }
 
-#
+# change if to false if account for storage lens and not organization
+variable "organization" {
+  description = "true if organization enable for lens or false if account only"
+  type = bool
+  default = true
+}
+
 variable "namelensdashboard" {
   description = "name of the lens dashboard"
   type        = string

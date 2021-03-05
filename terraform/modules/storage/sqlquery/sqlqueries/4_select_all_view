@@ -1,0 +1,2 @@
+# replace with your DB.view create during sql query 3
+SELECT * FROM "storagelensanalytic"."globalview"

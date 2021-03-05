@@ -58,9 +58,20 @@ resource "aws_s3_bucket_public_access_block" "blockbucket" {
   ]
 }
 
-# ! add workgroup v2 for athena- faster and more effcient 
+# Old version not supporting storage
+/*
+
 resource "aws_glue_catalog_database" "aws_glue_db" {
   name = "${var.project}-${var.environment}-glue-db"
+}
+*/
+
+resource "aws_athena_database" "dbathena" {
+  name   = "database_terraform"
+  bucket = aws_s3_bucket.s3_backend["athenabucket"].id
+  depends_on = [ 
+    aws_s3_bucket.s3_backend
+   ]
 }
 
 # Creation role 
@@ -306,7 +317,7 @@ resource "aws_iam_role_policy_attachment" "lambda_role_attach_policy-lens" {
 
 # Creation of Glue crawler 
 resource "aws_glue_crawler" "glue_crawler" {
-  database_name = aws_glue_catalog_database.aws_glue_db.id
+  database_name = aws_athena_database.dbathena.id
   name          = "${var.project}-${var.environment}-crawler"
   role          = aws_iam_role.gluerole.id
   tags          = var.tags
@@ -321,14 +332,14 @@ resource "aws_glue_crawler" "glue_crawler" {
     update_behavior = "UPDATE_IN_DATABASE"
   }
   depends_on = [
-    aws_glue_catalog_database.aws_glue_db,
+    aws_athena_database.dbathena,
     aws_iam_role.gluerole
   ]
 }
 # Crawler for s3 lens
 
 resource "aws_glue_crawler" "glue_crawler-lens" {
-  database_name = aws_glue_catalog_database.aws_glue_db.id
+  database_name = aws_athena_database.dbathena.id
   name          = "${var.project}-${var.environment}-crawler-lens"
   role          = aws_iam_role.gluerole-lens.id
   tags          = var.tags
@@ -342,8 +353,9 @@ resource "aws_glue_crawler" "glue_crawler-lens" {
     delete_behavior = "DELETE_FROM_DATABASE"
     update_behavior = "UPDATE_IN_DATABASE"
   }
+  table_prefix = "lens"
   depends_on = [
-    aws_glue_catalog_database.aws_glue_db,
+    aws_athena_database.dbathena,
     aws_iam_role.gluerole-lens
   ]
 }
@@ -444,7 +456,7 @@ resource "aws_s3_bucket_notification" "bucket_notification_cost_report" {
 
   depends_on = [
     aws_lambda_permission.allow_bucket_event_notification,
-    aws_s3_bucket.s3_backend
+    aws_s3_bucket.s3_backend["costbucket"]
     ]
 }
 
@@ -455,20 +467,19 @@ resource "aws_s3_bucket_notification" "bucket_notification-lens" {
   lambda_function {
     lambda_function_arn = aws_lambda_function.lambdarungluefunction-lens.arn
     events              = ["s3:ObjectCreated:*"]
-    #filter_prefix       = ""
-    filter_prefix       = "StorageLens/${data.aws_organizations_organization.organization.id}/${var.namelensdashboard}/V_1/reports/"
+    filter_prefix       = "StorageLens/${local.accountprefix}/${var.namelensdashboard}/V_1/reports/"
     filter_suffix       = ".par"
   }
 
   depends_on = [
     aws_lambda_permission.allow_bucket_event_notification-lens,
-    aws_s3_bucket.s3_backend
+    aws_s3_bucket.s3_backend["lensbucket"]
     ]
 }
 
 resource "aws_athena_workgroup" "workgroupcostathena" {
   name = "workgroupcostathena"
-
+  force_destroy = true
   configuration {
     enforce_workgroup_configuration    = true
     publish_cloudwatch_metrics_enabled = true
@@ -487,10 +498,7 @@ resource "aws_athena_workgroup" "workgroupcostathena" {
    tags = var.tags
 }
 
-resource "aws_athena_database" "dbathena" {
-  name   = "database_terraform"
-  bucket = aws_s3_bucket.s3_backend["athenabucket"].id
-}
+
 
 resource "aws_athena_named_query" "listcost" {
   name      = "list_cost_report"
@@ -499,18 +507,3 @@ resource "aws_athena_named_query" "listcost" {
   query     = "SELECT * FROM ${var.costreportname} WHERE MONTH = CAST(MONTH(CURRENT_DATE) AS varchar(4)) AND YEAR = CAST(YEAR(CURRENT_DATE) AS varchar(4)) AND line_item_product_code = 'AmazonS3'"
 }
 
-/*
-
-#https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cur_report_definition 
-/*
-resource "aws_cur_report_definition" "report-billing-master-account" {
-  report_name                =  var.report_name 
-  time_unit                  = "DAILY"
-  format                     = "Parquet"
-  compression                = "Parquet"
-  additional_schema_elements = ["RESOURCES"]
-  s3_bucket                  = var.bucket_report
-  s3_region                  = "eu-west-1"
-  additional_artifacts       = ["ATHENA"]
-}
-*/
