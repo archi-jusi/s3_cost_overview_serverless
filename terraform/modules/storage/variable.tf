@@ -68,6 +68,10 @@ variable "namebucketlens" {
   default     = "staging-aws-s3-cost-overview-lens"
 }
 
+variable "databasename" {
+  description = "name of the database"
+  type        = string
+}
 
 
 variable "tags" {

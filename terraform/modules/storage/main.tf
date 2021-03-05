@@ -68,7 +68,7 @@ resource "aws_glue_catalog_database" "aws_glue_db" {
 */
 
 resource "aws_athena_database" "dbathena" {
-  name   = "database_terraform"
+  name   = var.databasename
   bucket = aws_s3_bucket.s3_backend["athenabucket"].id
   depends_on = [ 
     aws_s3_bucket.s3_backend
