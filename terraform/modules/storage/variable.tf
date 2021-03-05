@@ -3,12 +3,21 @@ locals {
   # concatenate current region and account ex : eu-west-1:314283085815
   currentaccountregion = join(":", [data.aws_region.current.name, data.aws_caller_identity.current.account_id])
   prefixcostreport = "s3://${var.namebucketcostreport}/${var.costprefix}/${var.costreportname}/${var.costreportname}/"
+  prefixlens = "s3://${var.namebucketlens}/StorageLens/${data.aws_organizations_organization.organization.id}/${var.namelensdashboard}/V_1/reports/"
   bucketmap = {
-    costbucket = "${var.namebucketcostreport}"
-    lensbucket = "${var.namebucketlens}"
-    athenabucket = "${var.namebucketathena}"
+    costbucket = var.namebucketcostreport
+    lensbucket = var.namebucketlens
+    athenabucket = var.namebucketathena
   }
-  arncost = "arn:aws:s3:::${var.namebucketcostreport}"
+  arncost = "arn:aws:s3:::${var.namebucketcostreport}/"
+  arnlens = "arn:aws:s3:::${var.namebucketlens}/"
+  
+}
+
+#
+variable "namelensdashboard" {
+  description = "name of the lens dashboard"
+  type        = string
 }
 
 variable "project" {
@@ -19,7 +28,7 @@ variable "project" {
 variable "environment" {
   description = "name of the environment"
   type        = string
-  default     = "staging"
+  default     = "test"
 }
 
 variable "namebucketcostreport" {

@@ -15,11 +15,19 @@ data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
 
+data "aws_iam_policy" "gluepolicy" {
+  arn = "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+}
+
+# get the organization id for lens
+data "aws_organizations_organization" "organization" {}
 
 resource "aws_s3_bucket" "s3_backend" {
   for_each = local.bucketmap
-  bucket   = "${each.value}"
+  bucket   = each.value
   acl      = "private"
+  
+  force_destroy = true
   
   versioning {
     enabled = true
@@ -36,19 +44,21 @@ resource "aws_s3_bucket" "s3_backend" {
   }
 }
 
-
 resource "aws_s3_bucket_public_access_block" "blockbucket" {
   for_each = local.bucketmap
-  bucket   = "${each.value}-backend-bucket"
+  bucket   = each.value
 
   block_public_acls   = true
   block_public_policy = true
+  restrict_public_buckets = true
+  ignore_public_acls = true
+
   depends_on = [
-    aws_s3_bucket.s3_backend,
+    aws_s3_bucket.s3_backend  
   ]
 }
 
-# ! add location for db on s3 - faster and more effcient
+# ! add workgroup v2 for athena- faster and more effcient 
 resource "aws_glue_catalog_database" "aws_glue_db" {
   name = "${var.project}-${var.environment}-glue-db"
 }
@@ -73,6 +83,25 @@ resource "aws_iam_role" "gluerole" {
   tags = var.tags
 }
 
+resource "aws_iam_role" "gluerole-lens" {
+  name = "${var.project}-${var.environment}-role-glue-lens"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Sid    = ""
+        Principal = {
+          Service = "glue.amazonaws.com"
+        }
+      },
+    ]
+  })
+  tags = var.tags
+}
+
+
 resource "aws_iam_role" "lambdarole" {
   name = "${var.project}-${var.environment}-role-lambda"
   assume_role_policy = jsonencode({
@@ -91,8 +120,25 @@ resource "aws_iam_role" "lambdarole" {
   tags = var.tags
 }
 
+resource "aws_iam_role" "lambdarole-lens" {
+  name = "${var.project}-${var.environment}-role-lambda-lens"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Sid    = ""
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+  tags = var.tags
+}
+
 # Creation policy document for lambda 
-# 
 
 data "aws_iam_policy_document" "policy-document-lambda" {
   statement {
@@ -119,10 +165,43 @@ data "aws_iam_policy_document" "policy-document-lambda" {
   }
 }
 
+
+data "aws_iam_policy_document" "policy-document-lambda-lens" {
+  statement {
+    actions   = ["logs:CreateLogGroup"]
+    resources = ["arn:aws:logs:${local.currentaccountregion}:*"]
+    effect = "Allow"
+  }
+  statement {
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["arn:aws:logs:${local.currentaccountregion}:log-group:*"]
+    effect = "Allow"
+  }
+
+  statement {
+    actions   = ["glue:StartCrawler"]
+    resources = ["*"]
+    effect = "Allow"
+  }
+  
+  statement {
+    actions   = ["s3:PutBucketNotification"]
+    resources = ["${local.arnlens}*"]
+    effect = "Allow"
+  }
+}
+
+
 resource "aws_iam_policy" "policy-lambda" {
   name        = "${var.project}-${var.environment}-lambda-policy"
-  description = "Policy used by lambda"
+  description = "Policy used by lambda for cost and usage report"
   policy = data.aws_iam_policy_document.policy-document-lambda.json
+}
+
+resource "aws_iam_policy" "policy-lambda-lens" {
+  name        = "${var.project}-${var.environment}-lambda-policy-lens"
+  description = "Policy used by lambda for lens crawler"
+  policy = data.aws_iam_policy_document.policy-document-lambda-lens.json
 }
 
 # Policy Document for Glue Crawler
@@ -151,24 +230,78 @@ data "aws_iam_policy_document" "policy-document-glue" {
   }
 }
 
-# Create the policy based on the document
-resource "aws_iam_policy" "policy-glue" {
+data "aws_iam_policy_document" "policy-document-glue-lens" {
+  
+  statement {
+    actions   = ["s3:GetObject", "s3:PutObject"]
+    resources = ["${local.arnlens}*"]
+    effect = "Allow"
+  }
+  statement {
+    actions   = ["logs:CreateLogGroup"]
+    resources = ["arn:aws:logs:${local.currentaccountregion}:*"]
+    effect = "Allow"
+  }
+  statement {
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["arn:aws:logs:${local.currentaccountregion}:log-group:*"]
+    effect = "Allow"
+  }
+  
+  statement {
+    actions   = ["glue:UpdateDatabase", "glue:UpdatePartition", "glue:CreateTable", "glue:UpdateTable", "glue:ImportCatalogToGlue"]
+    resources = ["*"]
+    effect = "Allow"
+  }
+}
+
+
+# Create the policy based on the document for cost usage
+resource "aws_iam_policy" "custom-policy-glue" {
   name        = "${var.project}-${var.environment}-glue-policy"
-  description = "Policy used by glue crawler"
+  description = "Policy used by glue crawler for cost and usage"
   policy = data.aws_iam_policy_document.policy-document-glue.json
 }
 
-# Attachment for Glue 
-
-resource "aws_iam_role_policy_attachment" "glue_role_attach_policy" {
-  role       = aws_iam_role.gluerole.id
-  policy_arn = aws_iam_policy.policy-glue.arn
+# policy for the crawler for lens
+resource "aws_iam_policy" "custom-policy-glue-lens" {
+  name        = "${var.project}-${var.environment}-glue-policy-lens"
+  description = "Policy used by glue crawler for lens"
+  policy = data.aws_iam_policy_document.policy-document-glue-lens.json
 }
+
+# Attachment for Glue -
+
+resource "aws_iam_role_policy_attachment" "glue_role_attach_policy_managed" {
+  role       = aws_iam_role.gluerole.id
+  policy_arn = data.aws_iam_policy.gluepolicy.arn
+}
+resource "aws_iam_role_policy_attachment" "glue_role_attach_policy_managed-lens" {
+  role       = aws_iam_role.gluerole-lens.id
+  policy_arn = data.aws_iam_policy.gluepolicy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "glue_role_attach_policy_custom" {
+  role       = aws_iam_role.gluerole.id
+  policy_arn = aws_iam_policy.custom-policy-glue.arn
+}
+
+resource "aws_iam_role_policy_attachment" "glue_role_attach_policy_custom-lens" {
+  role       = aws_iam_role.gluerole-lens.id
+  policy_arn = aws_iam_policy.custom-policy-glue-lens.arn
+}
+
+ 
 
 # Attachment for Lambda
 resource "aws_iam_role_policy_attachment" "lambda_role_attach_policy" {
   role       = aws_iam_role.lambdarole.id
   policy_arn = aws_iam_policy.policy-lambda.arn
+}
+# Attachment for Lambda
+resource "aws_iam_role_policy_attachment" "lambda_role_attach_policy-lens" {
+  role       = aws_iam_role.lambdarole-lens.id
+  policy_arn = aws_iam_policy.policy-lambda-lens.arn
 }
 
 # Creation of Glue crawler 
@@ -179,7 +312,7 @@ resource "aws_glue_crawler" "glue_crawler" {
   tags          = var.tags
   # required that cost report are using prefix cost - the partition after the prefix is done by AWS 
   s3_target {
-    path       = "${local.prefixcostreport}"
+    path       = local.prefixcostreport
     exclusions = ["**.json", "**.yml", "**.sql", "**.csv", "**.gz", "**.zip"]
   }
 
@@ -192,20 +325,42 @@ resource "aws_glue_crawler" "glue_crawler" {
     aws_iam_role.gluerole
   ]
 }
+# Crawler for s3 lens
+
+resource "aws_glue_crawler" "glue_crawler-lens" {
+  database_name = aws_glue_catalog_database.aws_glue_db.id
+  name          = "${var.project}-${var.environment}-crawler-lens"
+  role          = aws_iam_role.gluerole-lens.id
+  tags          = var.tags
+  # required that cost report are using prefix cost - the partition after the prefix is done by AWS 
+  s3_target {
+    path       = local.prefixlens
+    exclusions = ["**.json", "**.yml", "**.sql", "**.csv", "**.gz", "**.zip"]
+  }
+
+  schema_change_policy {
+    delete_behavior = "DELETE_FROM_DATABASE"
+    update_behavior = "UPDATE_IN_DATABASE"
+  }
+  depends_on = [
+    aws_glue_catalog_database.aws_glue_db,
+    aws_iam_role.gluerole-lens
+  ]
+}
 
 
 ## Preparation for Lambda 
 
 data "archive_file" "lambda_zip_runglue" {
   type        = "zip"
-  source_file = "${path.module}/runglue.js"
-  output_path = "${path.module}/runglue.zip"
+  source_file = "${path.module}/lambdafunction/runglue.js"
+  output_path = "${path.module}/lambdafunction/runglue.zip"
 
 }
 
 
 resource "aws_lambda_function" "lambdarungluefunction" {
-  filename      = "${path.module}/runglue.zip"
+  filename      = "${path.module}/lambdafunction/runglue.zip"
   description   = "Lambda function for run glue crawler"
   function_name = "${var.project}-${var.environment}-lambdarungluecrawler"
   role          = aws_iam_role.lambdarole.arn
@@ -213,7 +368,7 @@ resource "aws_lambda_function" "lambdarungluefunction" {
   # handler name need to be the same as the filename
   handler       = "runglue.handler"
   
-  #timeout = 120
+  timeout = 120
   runtime = "nodejs10.x"
   
   environment {
@@ -228,13 +383,54 @@ resource "aws_lambda_function" "lambdarungluefunction" {
   ]
 }
 
+resource "aws_lambda_function" "lambdarungluefunction-lens" {
+  filename      = "${path.module}/lambdafunction/runglue.zip"
+  description   = "Lambda function for run glue crawler for lens"
+  function_name = "${var.project}-${var.environment}-lambdarungluecrawler-lens"
+  role          = aws_iam_role.lambdarole-lens.arn
+
+  # handler name need to be the same as the filename
+  handler       = "runglue.handler"
+  
+  timeout = 120
+  runtime = "nodejs10.x"
+  
+  environment {
+    variables = {
+      CRAWLNAME = aws_glue_crawler.glue_crawler-lens.id
+    }
+  }
+  tags = var.tags
+  
+  depends_on = [
+    aws_iam_role.lambdarole-lens,
+  ]
+}
+
+
 resource "aws_lambda_permission" "allow_bucket_event_notification" {
   statement_id  = "AllowExecutionFromS3Bucket"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambdarungluefunction.arn
   principal     = "s3.amazonaws.com"
   source_arn    = aws_s3_bucket.s3_backend["costbucket"].arn
+  depends_on = [ 
+    aws_s3_bucket.s3_backend,
+   ]
 }
+
+resource "aws_lambda_permission" "allow_bucket_event_notification-lens" {
+  statement_id  = "AllowExecutionFromS3Bucket"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambdarungluefunction-lens.arn
+  principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.s3_backend["lensbucket"].arn
+  depends_on = [ 
+    aws_s3_bucket.s3_backend,
+   ]
+
+}
+
 
 resource "aws_s3_bucket_notification" "bucket_notification_cost_report" {
   bucket = aws_s3_bucket.s3_backend["costbucket"].id
@@ -246,9 +442,64 @@ resource "aws_s3_bucket_notification" "bucket_notification_cost_report" {
     filter_suffix       = ".parquet"
   }
 
-  depends_on = [aws_lambda_permission.allow_bucket_event_notification]
+  depends_on = [
+    aws_lambda_permission.allow_bucket_event_notification,
+    aws_s3_bucket.s3_backend
+    ]
 }
 
+resource "aws_s3_bucket_notification" "bucket_notification-lens" {
+
+  bucket = aws_s3_bucket.s3_backend["lensbucket"].id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.lambdarungluefunction-lens.arn
+    events              = ["s3:ObjectCreated:*"]
+    #filter_prefix       = ""
+    filter_prefix       = "StorageLens/${data.aws_organizations_organization.organization.id}/${var.namelensdashboard}/V_1/reports/"
+    filter_suffix       = ".par"
+  }
+
+  depends_on = [
+    aws_lambda_permission.allow_bucket_event_notification-lens,
+    aws_s3_bucket.s3_backend
+    ]
+}
+
+resource "aws_athena_workgroup" "workgroupcostathena" {
+  name = "workgroupcostathena"
+
+  configuration {
+    enforce_workgroup_configuration    = true
+    publish_cloudwatch_metrics_enabled = true
+
+    result_configuration {
+      output_location = "s3://${var.namebucketathena}/output/"
+
+      encryption_configuration {
+        encryption_option = "SSE_S3"
+      }
+    }
+  }
+  depends_on = [ 
+    aws_s3_bucket.s3_backend,
+   ]
+   tags = var.tags
+}
+
+resource "aws_athena_database" "dbathena" {
+  name   = "database_terraform"
+  bucket = aws_s3_bucket.s3_backend["athenabucket"].id
+}
+
+resource "aws_athena_named_query" "listcost" {
+  name      = "list_cost_report"
+  workgroup = aws_athena_workgroup.workgroupcostathena.id
+  database  = aws_athena_database.dbathena.name
+  query     = "SELECT * FROM ${var.costreportname} WHERE MONTH = CAST(MONTH(CURRENT_DATE) AS varchar(4)) AND YEAR = CAST(YEAR(CURRENT_DATE) AS varchar(4)) AND line_item_product_code = 'AmazonS3'"
+}
+
+/*
 
 #https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cur_report_definition 
 /*

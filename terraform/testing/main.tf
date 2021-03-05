@@ -25,5 +25,18 @@ provider "aws" {
 
 module "aws_s3_backend" {
   source = "../modules/storage/"
+  project              = "aws-s3-cost"
+  environment          = "supertest"
+  namebucketcostreport = "supertest-cost-bucket"
+  namebucketathena     = "supertest-cost-athena"
+  namebucketlens       = "supertest-cost-lens"
+  costprefix           = "cost"
+  costreportname       = "costreport"
+  tags = {
+    env       = "test",
+    owner     = "devopshandsonlab",
+    terraform = "true"
+    project   = "s3_overview_cost_project"
+  }
 }
 

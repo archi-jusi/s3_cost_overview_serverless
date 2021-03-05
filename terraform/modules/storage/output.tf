@@ -11,6 +11,15 @@ output "regionbucket" {
   value       = values(aws_s3_bucket.s3_backend)[*].region
 }
 
+output "lambdarole" {
+  description = "role for lambda"
+  value       = aws_iam_role.lambdarole.id
+}
+output "gluerole" {
+  description = "role for glue"
+  value       = aws_iam_role.gluerole.id
+}
+
 output "rendered_lambda_json_policy" {
   description = "lambda json policy"
   value = data.aws_iam_policy_document.policy-document-lambda.json
@@ -40,4 +49,8 @@ output "gluecrawler"  {
 output "databaseforathena" {
   description = "DB destination for crawl"
   value = aws_glue_catalog_database.aws_glue_db.id
+}
+output "workgroupathena" {
+  description = "workgroup for athena"
+  value = aws_athena_workgroup.workgroupcostathena.id
 }

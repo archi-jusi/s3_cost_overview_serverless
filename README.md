@@ -96,9 +96,12 @@ The architecture step will be to evaluate the solution available and to analyse 
 
    Cons and limitation : Require until 24h to be active and you can use Terraform to implement it only in us-east-1 region.  
 
-### Architecture project 
+### Architecture 
 
-My choice after analyse of the different solution will be to use **cost and usage report and s3 storage lens** with export to parquet file on S3. This solution will cover all the need for cost and bucket information and it will be entirely serverless and it will not be expensive. 
+My choice after analyse of the different solution will be to use **cost and usage report and s3 storage lens** with export to parquet file on S3.
+Apache Parquet file support fast data processing and is compressed, it's a lot more  more efficient than row file like csv.
+
+This solution will cover all the need for cost and bucket information and it will be entirely serverless and it will not be expensive. Moreover, this solution is flexible and it will be possible easily to cover storage of different resource on AWS.
 
 [AWS Cost and Usage Reports](https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html) will create report periodically (hourly or daily) uploaded to an S3 bucket for the AWS Organizations master account.
 
@@ -113,5 +116,8 @@ Athena will be use to query the database to get the information about our bucket
 
 Using Athena, we will only pay when we are using the command and everything will be fully serverless and automated. 
 
-The tools will connect to Athena to make the query and return the result based on the argument we provide. 
+The tools will connect to [Athena](https://docs.aws.amazon.com/athena/latest/ug/what-is.html) to make the query and return the result based on the argument we provide. 
+Athena is Serverless, so you don't have to manage any infrastructure.
+
+Moreover Athena can integrate easily to QuickSight for easy data virtualization and BI. 
 

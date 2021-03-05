@@ -10,10 +10,25 @@ terraform {
 }
 
 provider "aws" {
-  region  = "eu-west-1"
+  region = "eu-west-1"
 }
 
 
 module "aws_s3_backend" {
-  source = "../modules/storage/"
+  source               = "../modules/storage/"
+  project              = "aws-s3-cost"
+  environment          = "staging"
+  namebucketcostreport = "staging-cost-bucket"
+  namebucketathena     = "staging-cost-athena"
+  namebucketlens       = "staging-cost-lens"
+  namelensdashboard    = "dashboard-lens-staging"
+  costprefix           = "cost"
+  costreportname       = "costreport"
+  tags = {
+    env       = "staging",
+    owner     = "devopshandsonlab",
+    terraform = "true"
+    project   = "s3_overview_cost_project"
+  }
 }
+
