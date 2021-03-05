@@ -152,19 +152,20 @@ provider "aws" {
   ...
 }
 
-
 module "aws_s3_backend" {
-  source               = "..."
-  project              = "aws-s3-cost"
-  environment          = "staging"
-  namebucketcostreport = "staging-cost-bucket"
-  namebucketathena     = "staging-cost-athena"
-  namebucketlens       = "staging-cost-lens"
-  namelensdashboard    = "dashboard-lens-staging"
-  costprefix           = "cost"
-  costreportname       = "costreport"
+  source               = "git::https://github.com/archi-jusi/s3_cost_overview_serverless.git//terraform//modules/storage"
+  project              = "aws-s3-cost-prod"
+  environment          = "prod"
+  namebucketcostreport = "prod-cost-bucket"
+  namebucketathena     = "prod-cost-athena"
+  namebucketlens       = "prod-cost-lens"
+  namelensdashboard    = "dashboard-lens-prod"
+  costprefix           = "prodcost"
+  costreportname       = "prodcostreport"
+  databasename         = "prodcostdb"
+  workgroupname        = "prod-workgroup-cost"
   tags = {
-    env       = "staging",
+    env       = "prod",
     owner     = "devopshandsonlab",
     terraform = "true"
     project   = "s3_overview_cost_project"
@@ -177,39 +178,44 @@ Note:
 The variable cost prefix and cost reportname will be used later to create the cost and usage report. 
 Unhapilly, this step will not be automate as Terraform has the feature only for us-east-1
 
-The module will deploy 31 resources as below: 
+The module will deploy 35 resources as below: 
+
 ```hcl
-module.aws_s3_backend.aws_athena_database.dbathena
-module.aws_s3_backend.aws_athena_named_query.listcost
-module.aws_s3_backend.aws_athena_workgroup.workgroupcostathena
-module.aws_s3_backend.aws_glue_crawler.glue_crawler
-module.aws_s3_backend.aws_glue_crawler.glue_crawler-lens
-module.aws_s3_backend.aws_iam_policy.custom-policy-glue
-module.aws_s3_backend.aws_iam_policy.custom-policy-glue-lens
-module.aws_s3_backend.aws_iam_policy.policy-lambda
-module.aws_s3_backend.aws_iam_policy.policy-lambda-lens
-module.aws_s3_backend.aws_iam_role.gluerole
-module.aws_s3_backend.aws_iam_role.gluerole-lens
-module.aws_s3_backend.aws_iam_role.lambdarole
-module.aws_s3_backend.aws_iam_role.lambdarole-lens
-module.aws_s3_backend.aws_iam_role_policy_attachment.glue_role_attach_policy_custom
-module.aws_s3_backend.aws_iam_role_policy_attachment.glue_role_attach_policy_custom-lens
-module.aws_s3_backend.aws_iam_role_policy_attachment.glue_role_attach_policy_managed
-module.aws_s3_backend.aws_iam_role_policy_attachment.glue_role_attach_policy_managed-lens
-module.aws_s3_backend.aws_iam_role_policy_attachment.lambda_role_attach_policy
-module.aws_s3_backend.aws_iam_role_policy_attachment.lambda_role_attach_policy-lens
-module.aws_s3_backend.aws_lambda_function.lambdarungluefunction
-module.aws_s3_backend.aws_lambda_function.lambdarungluefunction-lens
-module.aws_s3_backend.aws_lambda_permission.allow_bucket_event_notification
-module.aws_s3_backend.aws_lambda_permission.allow_bucket_event_notification-lens
-module.aws_s3_backend.aws_s3_bucket.s3_backend["athenabucket"]
-module.aws_s3_backend.aws_s3_bucket.s3_backend["costbucket"]
-module.aws_s3_backend.aws_s3_bucket.s3_backend["lensbucket"]
-module.aws_s3_backend.aws_s3_bucket_notification.bucket_notification-lens
-module.aws_s3_backend.aws_s3_bucket_notification.bucket_notification_cost_report
-module.aws_s3_backend.aws_s3_bucket_public_access_block.blockbucket["athenabucket"]
-module.aws_s3_backend.aws_s3_bucket_public_access_block.blockbucket["costbucket"]
-module.aws_s3_backend.aws_s3_bucket_public_access_block.blockbucket["lensbucket"]
+aws_athena_database.dbathena
+aws_athena_named_query.listcost
+aws_athena_named_query.sqlcostview
+aws_athena_named_query.sqljoinview
+aws_athena_named_query.sqllensview
+aws_athena_named_query.sqlselectglobalview
+aws_athena_workgroup.workgroupcostathena
+aws_glue_crawler.glue_crawler
+aws_glue_crawler.glue_crawler-lens
+aws_iam_policy.custom-policy-glue
+aws_iam_policy.custom-policy-glue-lens
+aws_iam_policy.policy-lambda
+aws_iam_policy.policy-lambda-lens
+aws_iam_role.gluerole
+aws_iam_role.gluerole-lens
+aws_iam_role.lambdarole
+aws_iam_role.lambdarole-lens
+aws_iam_role_policy_attachment.glue_role_attach_policy_custom
+aws_iam_role_policy_attachment.glue_role_attach_policy_custom-lens
+aws_iam_role_policy_attachment.glue_role_attach_policy_managed
+aws_iam_role_policy_attachment.glue_role_attach_policy_managed-lens
+aws_iam_role_policy_attachment.lambda_role_attach_policy
+aws_iam_role_policy_attachment.lambda_role_attach_policy-lens
+aws_lambda_function.lambdarungluefunction
+aws_lambda_function.lambdarungluefunction-lens
+aws_lambda_permission.allow_bucket_event_notification
+aws_lambda_permission.allow_bucket_event_notification-lens
+aws_s3_bucket.s3_backend["athenabucket"]
+aws_s3_bucket.s3_backend["costbucket"]
+aws_s3_bucket.s3_backend["lensbucket"]
+aws_s3_bucket_notification.bucket_notification-lens
+aws_s3_bucket_notification.bucket_notification_cost_report
+aws_s3_bucket_public_access_block.blockbucket["athenabucket"]
+aws_s3_bucket_public_access_block.blockbucket["costbucket"]
+aws_s3_bucket_public_access_block.blockbucket["lensbucket"]
 ```
 
 Once everything is deployed from the module with Terraform you will need to create a cost and usage report using the variable set in the module : 
