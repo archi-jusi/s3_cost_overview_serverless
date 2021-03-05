@@ -291,3 +291,9 @@ select Include all accounts in your organization or Limit the scope to your sign
 ![storagelens3](image/storagelens3.png)
 
 Storage Lens should be enable in the next 48h. 
+
+Once, StorageLens and cost report are enable, S3 event notification will inform Lambda which will run the glue crawler to update the database. 
+
+When everything is settle, you will be able from Athena, choosing the correct workgroup defined in the module to query each new table freshly created automatically. 
+
+You will find query that you need to change and execute in order, to create view and join table to make query faster and easier. 
