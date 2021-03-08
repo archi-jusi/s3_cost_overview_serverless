@@ -24,6 +24,9 @@ module "aws_s3_backend" {
   namelensdashboard    = "dashboard-lens-staging"
   costprefix           = "cost"
   costreportname       = "costreport"
+  workgroupname        = "workgroupcostathena"
+  databasename         = "database_terraform"
+  organization         = false
   tags = {
     env       = "staging",
     owner     = "devopshandsonlab",

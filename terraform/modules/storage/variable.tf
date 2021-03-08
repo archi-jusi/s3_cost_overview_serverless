@@ -3,7 +3,7 @@ locals {
   # concatenate current region and account ex : eu-west-1:314283085815
   currentaccountregion = join(":", [data.aws_region.current.name, data.aws_caller_identity.current.account_id])
   prefixcostreport = "s3://${var.namebucketcostreport}/${var.costprefix}/${var.costreportname}/${var.costreportname}/"
-  prefixlens = "s3://${var.namebucketlens}/StorageLens/${data.aws_organizations_organization.organization.id}/${var.namelensdashboard}/V_1/reports/"
+  prefixlens = var.organization == true ? "s3://${var.namebucketlens}/StorageLens/${data.aws_organizations_organization.organization.id}/${var.namelensdashboard}/V_1/reports/" : "s3://${var.namebucketlens}/StorageLens/${data.aws_caller_identity.current.account_id}/${var.namelensdashboard}/V_1/reports/"
   bucketmap = {
     costbucket = var.namebucketcostreport
     lensbucket = var.namebucketlens
@@ -14,7 +14,6 @@ locals {
   accountprefix = var.organization == true ? data.aws_organizations_organization.organization.id : data.aws_caller_identity.current.account_id
 
 }
-
 # change if to false if account for storage lens and not organization
 variable "organization" {
   description = "true if organization enable for lens or false if account only"
