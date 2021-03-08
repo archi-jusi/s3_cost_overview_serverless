@@ -315,7 +315,7 @@ To enable Storage Lens, Master account of your organization has to be used.
 By default, this terraform module is done for an organization but if you want to have this features just for the account you are using with Terraform, you can change the variable organization to false (bool). 
 
 ```hcl
-module "aws_s3_backend" {
+module "aws_s3_cost_explorer" {
   source               = "..."
   organization = false
   ...
@@ -329,7 +329,7 @@ You will need to use your **master account** to enable this feature for your org
 First choose a name, the name has to be what you define in the variable of the module **namelensdashboard** and the bucket 
 
 ```hcl
-module "aws_s3_backend" {
+module "aws_s3_cost_explorer" {
   source               = "..."
   namelensdashboard    = "dashboard-lens-staging"
   namebucketlens       = "staging-cost-lens"
@@ -360,6 +360,3 @@ Once, StorageLens and cost report are active, S3 event notification will notify 
 When everything is settle, you will be able from Athena, choosing the correct workgroup defined in the module to query each new table freshly created automatically. 
 
 You will find few saved queries in the workgroup that you need to execute in order to create view and join table to make your queries running faster and easier.
-
-
-
