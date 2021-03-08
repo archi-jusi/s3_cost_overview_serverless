@@ -70,6 +70,7 @@ resource "aws_glue_catalog_database" "aws_glue_db" {
 resource "aws_athena_database" "dbathena" {
   name   = var.databasename
   bucket = aws_s3_bucket.s3_backend["athenabucket"].id
+  force_destroy = true
   depends_on = [ 
     aws_s3_bucket.s3_backend
    ]

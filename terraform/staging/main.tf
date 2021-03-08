@@ -14,7 +14,7 @@ provider "aws" {
 }
 
 
-module "aws_s3_backend" {
+module "aws_s3_cost_explorer" {
   source               = "../modules/storage/"
   project              = "aws-s3-cost"
   environment          = "staging"

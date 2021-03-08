@@ -149,23 +149,24 @@ terraform {
 }
 
 provider "aws" {
-  ...
+  region = "eu-west-1"
 }
 
-module "aws_s3_backend" {
-  source               = "git::https://github.com/archi-jusi/s3_cost_overview_serverless.git//terraform//modules/storage"
-  project              = "aws-s3-cost-prod"
-  environment          = "prod"
-  namebucketcostreport = "prod-cost-bucket"
-  namebucketathena     = "prod-cost-athena"
-  namebucketlens       = "prod-cost-lens"
-  namelensdashboard    = "dashboard-lens-prod"
-  costprefix           = "prodcost"
-  costreportname       = "prodcostreport"
-  databasename         = "prodcostdb"
-  workgroupname        = "prod-workgroup-cost"
+module "aws_s3_cost_explorer" {
+  source               = "../modules/storage/"
+  project              = "aws-s3-cost"
+  environment          = "staging"
+  namebucketcostreport = "staging-cost-bucket"
+  namebucketathena     = "staging-cost-athena"
+  namebucketlens       = "staging-cost-lens"
+  namelensdashboard    = "dashboard-lens-staging"
+  costprefix           = "cost"
+  costreportname       = "costreport"
+  workgroupname        = "workgroupcostathena"
+  databasename         = "database_terraform"
+  organization         = false
   tags = {
-    env       = "prod",
+    env       = "staging",
     owner     = "devopshandsonlab",
     terraform = "true"
     project   = "s3_overview_cost_project"
@@ -178,11 +179,20 @@ Note:
 The variable cost prefix and cost reportname will be used later to create the cost and usage report. 
 Unhapilly, this step will not be automate as Terraform has the feature only for us-east-1
 
-The module will deploy 35 resources as below: 
+The module will deploy 34 resources as below: 
 
 ```hcl
+data.archive_file.lambda_zip_runglue
+data.aws_caller_identity.current
+data.aws_iam_policy.gluepolicy
+data.aws_iam_policy_document.policy-document-glue
+data.aws_iam_policy_document.policy-document-glue-lens
+data.aws_iam_policy_document.policy-document-lambda
+data.aws_iam_policy_document.policy-document-lambda-lens
+data.aws_organizations_organization.organization
+data.aws_partition.current
+data.aws_region.current
 aws_athena_database.dbathena
-aws_athena_named_query.listcost
 aws_athena_named_query.sqlcostview
 aws_athena_named_query.sqljoinview
 aws_athena_named_query.sqllensview
@@ -216,6 +226,49 @@ aws_s3_bucket_notification.bucket_notification_cost_report
 aws_s3_bucket_public_access_block.blockbucket["athenabucket"]
 aws_s3_bucket_public_access_block.blockbucket["costbucket"]
 aws_s3_bucket_public_access_block.blockbucket["lensbucket"]
+```
+
+output.tf has to be set as below 
+
+```hcl
+output "information" {
+  description = "output of module"
+  value       = module.aws_s3_cost_explorer
+}
+```
+
+and will output :
+
+```hcl
+Apply complete! Resources: 34 added, 0 changed, 0 destroyed.
+
+information = {
+  "arn" = [
+    "arn:aws:s3:::staging-cost-athena",
+    "arn:aws:s3:::staging-cost-bucket",
+    "arn:aws:s3:::staging-cost-lens",
+  ]
+  "bucket_name" = [
+    "staging-cost-athena",
+    "staging-cost-bucket",
+    "staging-cost-lens",
+  ]
+  "currentaccount" = "314283085815"
+  "currentpartition" = "eu-west-1:314283085815"
+  "currentregion" = "eu-west-1"
+  "databaseforathena" = "database_terraform"
+  "gluecrawler" = "aws-s3-cost-staging-crawler"
+  "gluerole" = "aws-s3-cost-staging-role-glue"
+  "gluerolelens" = "aws-s3-cost-staging-role-glue-lens"
+  "lambdarole" = "aws-s3-cost-staging-role-lambda"
+  "lambdarolelens" = "aws-s3-cost-staging-role-lambda-lens"
+  "regionbucket" = [
+    "eu-west-1",
+    "eu-west-1",
+    "eu-west-1",
+  ]
+  "workgroupathena" = "workgroupcostathena"
+}
 ```
 
 Once everything is deployed from the module with Terraform you will need to create a cost and usage report using the variable set in the module : 
@@ -302,7 +355,7 @@ Note : Select output format as Apache Parquet.
 
 Storage Lens should be enable in the next 48h ! :smile:
 
-Once, StorageLens and cost report are active, S3 event notification will notify Lambda which will run the glue crawler to update the glue DB.
+Once, StorageLens and cost report are active, S3 event notification will notify Lambda which will run the glue crawler to update the Glue Data Catalog.
 
 When everything is settle, you will be able from Athena, choosing the correct workgroup defined in the module to query each new table freshly created automatically. 
 
