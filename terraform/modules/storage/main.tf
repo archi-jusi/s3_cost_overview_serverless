@@ -512,20 +512,20 @@ resource "aws_athena_named_query" "sqllensview" {
   name      = "2-create light view for lens"
   workgroup = aws_athena_workgroup.workgroupcostathena.id
   database  = aws_athena_database.dbathena.name
-  query     = file("${path.module}/sqlquery/2_createviewstoragelens.sql") 
+  query     = templatefile("${path.module}/sqlquery/2_createviewstoragelens.sql", { db = aws_athena_database.dbathena.name}) 
 }
 
 resource "aws_athena_named_query" "sqljoinview" {
   name      = "3-create join view"
   workgroup = aws_athena_workgroup.workgroupcostathena.id
   database  = aws_athena_database.dbathena.name
-  query     = file("${path.module}/sqlquery/3_createjointableview.sql") 
+  query     = templatefile("${path.module}/sqlquery/3_createjointableview.sql", { db = aws_athena_database.dbathena.name}) 
 }
 
 resource "aws_athena_named_query" "sqlselectglobalview" {
   name      = "4-select global view"
   workgroup = aws_athena_workgroup.workgroupcostathena.id
   database  = aws_athena_database.dbathena.name
-  query     = file("${path.module}/sqlquery/4_select_all_view.sql") 
+  query     = templatefile("${path.module}/sqlquery/4_select_all_view.sql" , { db = aws_athena_database.dbathena.name}) 
 }
 
