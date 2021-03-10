@@ -155,7 +155,7 @@ provider "aws" {
 }
 
 module "aws_s3_cost_explorer" {
-  source               = "../modules/storage/"
+  source               = "git::https://github.com/archi-jusi/s3_cost_overview_serverless.git//terraform//modules/storage"
   project              = "aws-s3-cost"
   environment          = "staging"
   namebucketcostreport = "staging-cost-bucket"
