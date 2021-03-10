@@ -1,6 +1,7 @@
 # s3_cost_overview_serverless
-Tools to get cost and information for any bucket on AWS. 
-All backend infrastructure has to be deployed with Terraform. 
+Tools to get cost and information for any bucket on AWS using storage Lens and Cost and usage reporting.
+
+All backend infrastructure deployed with Terraform. 
 
 ## The challenge 
 
@@ -43,14 +44,15 @@ For each bucket:
 - Serverless if possible
 - Infrastructure as to be deployed using Terraform
 
-:warning: The tools need to still be efficient and get the result in seconds even with millions or billions of file.
+:warning: The tools need to be very fast and efficient and get the result in seconds even with millions or billions of file.
 
 
 ### Architecture - evaluation of the different solution
 
-The architecture step will be to evaluate the solution available and to analyse the pros and cons to see which direction will be the best to take.
+The architecture step will be to evaluate the different solution available and to analyse the pros and cons to choose the best solution available. Each solution has pros and cons. 
 
 1. Use aws CLI or boto3 and directly query S3 (S3 API get_objects_list_v2)
+   
    This is the first solution everyone will think as it's the fastest and easiest way to implement but there is a lot of limitations. 
    The drawback is :
    - slow 
@@ -65,7 +67,7 @@ The architecture step will be to evaluate the solution available and to analyse 
 
 2. Use aws CLI or boto3 and Cloudwatch
    
-   Same solution 
+   Same solution as the last one with few improvement
 
    Using cloudwatch you will not need to list content of buckets to get information about number of files on each bucket and type of storage but this solution will still be slow and expensive. 
    

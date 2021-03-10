@@ -1,1 +1,1 @@
-SELECT * FROM "${db}"."globalview"
+SELECT DISTINCT FROM "${db}"."globalview"
