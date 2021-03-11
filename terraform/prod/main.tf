@@ -14,7 +14,8 @@ provider "aws" {
 }
 
 
-module "aws_s3_backend" {
+
+module "aws_s3_cost_explorer" {
   #source               = "git::https://github.com/archi-jusi/s3_cost_overview_serverless.git//terraform//modules/storage?ref=v0.0.2"
   source               = "git::https://github.com/archi-jusi/s3_cost_overview_serverless.git//terraform//modules/storage"
   project              = "aws-s3-cost-prod"
